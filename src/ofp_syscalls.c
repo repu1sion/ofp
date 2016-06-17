@@ -98,6 +98,7 @@ ofp_bind(int sockfd, const struct ofp_sockaddr *addr, ofp_socklen_t addrlen)
 	td.td_ucred = NULL;
 	ofp_errno = ofp_sobind(so, (struct ofp_sockaddr *)&nonconstaddr,
 		&td);
+	printf("domdom\n");
 	return ofp_errno ? -1 : 0;
 }
 
@@ -193,6 +194,7 @@ ofp_recvfrom(int sockfd, void *buf, size_t len, int flags,
 		return -1;
 	if (src_addr && addrlen)
 		*addrlen = src_addr->sa_len;
+	printf("****************************************************** domdom recvfrom\n");
 	return (len - uio.uio_resid);
 }
 

@@ -36,7 +36,9 @@ static int (*libc_connect)(int, const struct sockaddr*, socklen_t);
 static ssize_t (*libc_read)(int, void*, size_t);
 static ssize_t (*libc_write)(int, void*, size_t);
 static ssize_t (*libc_recv)(int, void*, size_t, int);
+static ssize_t (*libc_recvfrom)(int, void*, size_t, int, struct sockaddr*, socklen_t*);
 static ssize_t (*libc_send)(int, const void*, size_t, int);
+static ssize_t (*libc_sendto)(int, const void*, size_t, int, const struct sockaddr*, socklen_t);
 
 void setup_socket_wrappers(void)
 {
@@ -52,6 +54,8 @@ void setup_socket_wrappers(void)
 	LIBC_FUNCTION(write);
 	LIBC_FUNCTION(recv);
 	LIBC_FUNCTION(send);
+	LIBC_FUNCTION(recvfrom);
+	LIBC_FUNCTION(sendto);
 
 	setup_socket_wrappers_called = 1;
 }
@@ -629,6 +633,69 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags)
 	return recv_value;
 }
 
+ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *addr, socklen_t *addrlen)
+{
+        ssize_t recv_value;
+
+        if (IS_OFP_SOCKET(sockfd)) {
+                int ofp_flags = 0;
+                struct ofp_sockaddr_in ofp_addr;
+                ofp_socklen_t ofp_addrlen;
+
+                if (flags) {
+                        /*if (flags & MSG_CMSG_CLOEXEC)
+                                ofp_flags |= MSG_CMSG_CLOEXEC;*/
+                        if (flags & MSG_DONTWAIT)
+                                ofp_flags |= OFP_MSG_DONTWAIT;
+                        /*if (flags & MSG_ERRQUEUE)
+                                ofp_flags |= MSG_ERRQUEUE;*/
+                        if (flags & MSG_OOB)
+                                ofp_flags |= OFP_MSG_OOB;
+                        if (flags & MSG_PEEK)
+                                ofp_flags |= OFP_MSG_PEEK;
+                        if (flags & MSG_TRUNC)
+                                ofp_flags |= OFP_MSG_TRUNC;
+                        if (flags & MSG_WAITALL)
+                                ofp_flags |= OFP_MSG_WAITALL;
+                }
+
+                if (!addr) {
+                        errno = EFAULT;
+                        return -1;
+                }
+                if (*addrlen != sizeof(struct sockaddr_in)) {
+                        errno = EINVAL;
+                        return -1;
+                }
+
+                ofp_addr.sin_family = OFP_AF_INET;
+                ofp_addr.sin_addr.s_addr =
+                        ((const struct sockaddr_in *)addr)->sin_addr.s_addr;
+                ofp_addr.sin_port =
+                        ((const struct sockaddr_in *)addr)->sin_port;
+                ofp_addr.sin_len = sizeof(struct ofp_sockaddr_in);
+
+                ofp_addrlen = sizeof(ofp_addr);
+
+                recv_value = ofp_recvfrom(sockfd, buf, len, ofp_flags, (struct ofp_sockaddr *)&ofp_addr, addrlen);
+                errno = NETWRAP_ERRNO(ofp_errno);
+        } else if (libc_recv)
+                recv_value = (*libc_recv)(sockfd, buf, len, flags);
+        else { /* pre init*/
+                LIBC_FUNCTION(recv);
+
+                if (libc_recv)
+                        recv_value = (*libc_recv)(sockfd, buf, len, flags);
+                else {
+                        recv_value = -1;
+                        errno = EACCES;
+                }
+        }
+
+        return recv_value;
+}
+
+
 ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 {
 	ssize_t send_value;
@@ -673,4 +740,70 @@ ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 	return send_value;
 }
 
+ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *addr, socklen_t addrlen)
+{
+        ssize_t send_value;
 
+        if (IS_OFP_SOCKET(sockfd)) {
+                int ofp_flags = 0;
+                struct ofp_sockaddr_in ofp_addr;
+                ofp_socklen_t ofp_addrlen;
+
+                if (flags) {
+                        /*if (flags & MSG_CONFIRM)
+                                ofp_flags |= OFP_MSG_CONFIRM;*/
+                        if (flags & MSG_DONTROUTE)
+                                ofp_flags |= OFP_MSG_DONTROUTE;
+                        if (flags & MSG_DONTWAIT)
+                                ofp_flags |= OFP_MSG_DONTWAIT;
+                        if (flags & MSG_DONTWAIT)
+                                ofp_flags |= OFP_MSG_DONTWAIT;
+                        if (flags & MSG_EOR)
+                                ofp_flags |= OFP_MSG_EOR;
+                        /*if (flags & MSG_MORE)
+                                ofp_flags |= OFP_MSG_MORE;*/
+                        if (flags & MSG_NOSIGNAL)
+                                ofp_flags |= OFP_MSG_NOSIGNAL;
+                        if (flags & MSG_OOB)
+                                ofp_flags |= OFP_MSG_OOB;
+                }
+
+		if (!addr) {
+                        errno = EFAULT;
+                        return -1;
+                }
+                if (addrlen != sizeof(struct sockaddr_in)) {
+                        errno = EINVAL;
+                        return -1;
+                }
+
+                ofp_addr.sin_family = OFP_AF_INET;
+                /* ofp_addr.sin_addr.s_addr = */
+                /*       ((const struct sockaddr_in *)addr)->sin_addr.s_addr; */
+
+
+		ofp_addr.sin_addr.s_addr = inet_addr("1.2.3.4");
+
+                ofp_addr.sin_port =
+                        ((const struct sockaddr_in *)addr)->sin_port;
+                ofp_addr.sin_len = sizeof(struct ofp_sockaddr_in);
+
+                ofp_addrlen = sizeof(ofp_addr);
+
+                send_value = ofp_sendto(sockfd, buf, len, ofp_flags, (const struct ofp_sockaddr *)&ofp_addr, ofp_addrlen);
+                errno = NETWRAP_ERRNO(ofp_errno);
+        } else if (libc_send)
+                send_value = (*libc_sendto)(sockfd, buf, len, flags, addr, addrlen);
+        else {
+                LIBC_FUNCTION(sendto);
+
+                if (libc_sendto)
+                        send_value = (*libc_sendto)(sockfd, buf, len, flags, addr, addrlen);
+                else {
+                        send_value = -1;
+                        errno = EACCES;
+                }
+        }
+
+        return send_value;
+} 

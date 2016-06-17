@@ -28,6 +28,7 @@ int setsockopt(int sockfd, int level, int opt_name, const void *opt_val,
 {
 	int setsockopt_value;
 
+	printf("**************************************** here 1\n");
 	if (IS_OFP_SOCKET(sockfd)) {
 		int ofp_level;
 		int ofp_opt_name;
@@ -141,8 +142,10 @@ int getsockopt(int sockfd, int level, int opt_name, void *opt_val,
 	socklen_t *opt_len)
 {
 	int getsockopt_value = -1;
+	printf("**************************************** here\n");
 
 	if (IS_OFP_SOCKET(sockfd)) {
+		printf("******************************************** sol_socket here\n");
 		int ofp_level;
 		int ofp_opt_name;
 
