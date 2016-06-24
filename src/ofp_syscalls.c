@@ -6,6 +6,7 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 
+#include <stdio.h>
 #include <strings.h>
 #include <string.h>
 #include <stdarg.h>
@@ -154,6 +155,14 @@ ofp_sendto(int sockfd, const void *buf, size_t len, int flags,
 
 	td.td_proc.p_fibnum = so->so_fibnum;
 	td.td_ucred = NULL;
+
+	//debugs
+	unsigned int i;
+	unsigned char *p;
+	p = (unsigned char *)&nonconstaddr;
+	for (i = 0; i < sizeof(struct ofp_sockaddr); i++)
+		printf("%x ", p[i]);
+	printf("\n");
 
 	ofp_errno = ofp_sosend(so,
 	 (dest_addr && addrlen)? (struct ofp_sockaddr *)&nonconstaddr : NULL,

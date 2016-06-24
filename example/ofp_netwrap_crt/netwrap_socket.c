@@ -749,6 +749,8 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct 
                 struct ofp_sockaddr_in ofp_addr;
                 ofp_socklen_t ofp_addrlen;
 
+		printf("sendto() called via ofp socket\n");
+
                 if (flags) {
                         /*if (flags & MSG_CONFIRM)
                                 ofp_flags |= OFP_MSG_CONFIRM;*/
@@ -782,13 +784,25 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct 
                 /*       ((const struct sockaddr_in *)addr)->sin_addr.s_addr; */
 
 
-		ofp_addr.sin_addr.s_addr = inet_addr("1.2.3.4");
+		ofp_addr.sin_addr.s_addr = inet_addr("192.168.78.12");
 
                 ofp_addr.sin_port =
                         ((const struct sockaddr_in *)addr)->sin_port;
                 ofp_addr.sin_len = sizeof(struct ofp_sockaddr_in);
 
                 ofp_addrlen = sizeof(ofp_addr);
+
+	
+		int i;
+		unsigned char *p;
+		p = (unsigned char *)addr;
+		for (i = 0; i < sizeof(struct sockaddr); i++)
+			printf("%x ", p[i]);
+		printf("\n");
+
+		printf("family: 0x%x , addr: 0x%x , port: %u , len: %u , addrlen: %u \n",
+			ofp_addr.sin_family, ofp_addr.sin_addr.s_addr, ofp_addr.sin_port, ofp_addr.sin_len,
+			ofp_addrlen);
 
                 send_value = ofp_sendto(sockfd, buf, len, ofp_flags, (const struct ofp_sockaddr *)&ofp_addr, ofp_addrlen);
                 errno = NETWRAP_ERRNO(ofp_errno);
