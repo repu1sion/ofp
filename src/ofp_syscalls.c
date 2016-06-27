@@ -34,6 +34,8 @@
 #include "api/ofp_types.h"
 #include "ofpi_syscalls.h"
 
+//#define DEBUG
+
 int
 ofp_socket(int domain, int type, int protocol)
 {
@@ -157,12 +159,14 @@ ofp_sendto(int sockfd, const void *buf, size_t len, int flags,
 	td.td_ucred = NULL;
 
 	//debugs
+#ifdef DEBUG
 	unsigned int i;
 	unsigned char *p;
 	p = (unsigned char *)&nonconstaddr;
 	for (i = 0; i < sizeof(struct ofp_sockaddr); i++)
 		printf("%x ", p[i]);
 	printf("\n");
+#endif
 
 	ofp_errno = ofp_sosend(so,
 	 (dest_addr && addrlen)? (struct ofp_sockaddr *)&nonconstaddr : NULL,
