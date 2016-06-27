@@ -54,8 +54,8 @@ void setup_socket_wrappers(void)
 	LIBC_FUNCTION(write);
 	LIBC_FUNCTION(recv);
 	LIBC_FUNCTION(send);
-	LIBC_FUNCTION(recvfrom);
-	LIBC_FUNCTION(sendto);
+	//LIBC_FUNCTION(recvfrom);
+	//LIBC_FUNCTION(sendto);
 
 	setup_socket_wrappers_called = 1;
 }
@@ -550,6 +550,8 @@ ssize_t read(int sockfd, void *buf, size_t len)
 {
 	ssize_t read_value;
 
+	printf("%s() called\n", __func__);
+
 	if (IS_OFP_SOCKET(sockfd)) {
 		read_value = ofp_recv(sockfd, buf, len, 0);
 		errno = NETWRAP_ERRNO(ofp_errno);
@@ -595,6 +597,8 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags)
 {
 	ssize_t recv_value;
 
+	printf("%s() called\n", __func__);
+
 	if (IS_OFP_SOCKET(sockfd)) {
 		int ofp_flags = 0;
 
@@ -633,14 +637,27 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags)
 	return recv_value;
 }
 
+#if 1
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *addr, socklen_t *addrlen)
 {
         ssize_t recv_value;
 
+	printf("recvfrom() our implementation\n");
+
         if (IS_OFP_SOCKET(sockfd)) {
                 int ofp_flags = 0;
-                struct ofp_sockaddr_in ofp_addr;
+		struct ofp_sockaddr src_addr;		//repu1sion
+                //struct ofp_sockaddr_in ofp_addr;
                 ofp_socklen_t ofp_addrlen;
+		
+
+		printf("recvfrom() ofp socket. len: %zu, flags: %d \n", len, flags);
+		int i;
+		unsigned char *p;
+		p = (unsigned char *)addr;
+		for (i = 0; i < sizeof(struct sockaddr); i++)
+			printf("%x ", p[i]);
+		printf("\n");
 
                 if (flags) {
                         /*if (flags & MSG_CMSG_CLOEXEC)
@@ -667,7 +684,7 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
                         errno = EINVAL;
                         return -1;
                 }
-
+#if 0
                 ofp_addr.sin_family = OFP_AF_INET;
                 ofp_addr.sin_addr.s_addr =
                         ((const struct sockaddr_in *)addr)->sin_addr.s_addr;
@@ -676,9 +693,21 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
                 ofp_addr.sin_len = sizeof(struct ofp_sockaddr_in);
 
                 ofp_addrlen = sizeof(ofp_addr);
-
-                recv_value = ofp_recvfrom(sockfd, buf, len, ofp_flags, (struct ofp_sockaddr *)&ofp_addr, addrlen);
+#endif
+		printf("recvfrom!!!\n");
+                recv_value = ofp_recvfrom(sockfd, buf, len, ofp_flags, &src_addr, addrlen);
                 errno = NETWRAP_ERRNO(ofp_errno);
+
+		p = (unsigned char *)&src_addr;
+		for (i = 0; i < sizeof(struct ofp_sockaddr); i++)
+			printf("%x ", p[i]);
+		printf("\n");
+		
+		printf("addrlen: %d , errno: %d \n", addrlen, errno);
+
+		//set output param
+		memcpy(addr, &src_addr, 16);
+
         } else if (libc_recv)
                 recv_value = (*libc_recv)(sockfd, buf, len, flags);
         else { /* pre init*/
@@ -692,9 +721,10 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
                 }
         }
 
+	printf("exit recvfrom() with recv_value: %d\n", recv_value);
         return recv_value;
 }
-
+#endif
 
 ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 {
@@ -740,13 +770,14 @@ ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 	return send_value;
 }
 
+#if 1
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *addr, socklen_t addrlen)
 {
         ssize_t send_value;
 
         if (IS_OFP_SOCKET(sockfd)) {
                 int ofp_flags = 0;
-                struct ofp_sockaddr_in ofp_addr;
+                //struct ofp_sockaddr_in ofp_addr;
                 ofp_socklen_t ofp_addrlen;
 
 		printf("sendto() called via ofp socket\n");
@@ -774,24 +805,27 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct 
                         errno = EFAULT;
                         return -1;
                 }
+
+		ofp_addrlen = (ofp_socklen_t)addrlen;
+
+#if 0
                 if (addrlen != sizeof(struct sockaddr_in)) {
                         errno = EINVAL;
                         return -1;
                 }
-
                 ofp_addr.sin_family = OFP_AF_INET;
                 /* ofp_addr.sin_addr.s_addr = */
                 /*       ((const struct sockaddr_in *)addr)->sin_addr.s_addr; */
 
 
-		ofp_addr.sin_addr.s_addr = inet_addr("192.168.78.12");
+		ofp_addr.sin_addr.s_addr = inet_addr("192.168.78.10");
 
                 ofp_addr.sin_port =
                         ((const struct sockaddr_in *)addr)->sin_port;
                 ofp_addr.sin_len = sizeof(struct ofp_sockaddr_in);
 
                 ofp_addrlen = sizeof(ofp_addr);
-
+#endif
 	
 		int i;
 		unsigned char *p;
@@ -800,11 +834,14 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct 
 			printf("%x ", p[i]);
 		printf("\n");
 
+/*
 		printf("family: 0x%x , addr: 0x%x , port: %u , len: %u , addrlen: %u \n",
 			ofp_addr.sin_family, ofp_addr.sin_addr.s_addr, ofp_addr.sin_port, ofp_addr.sin_len,
 			ofp_addrlen);
+*/
 
-                send_value = ofp_sendto(sockfd, buf, len, ofp_flags, (const struct ofp_sockaddr *)&ofp_addr, ofp_addrlen);
+                //send_value = ofp_sendto(sockfd, buf, len, ofp_flags, (const struct ofp_sockaddr *)&ofp_addr, ofp_addrlen);
+                send_value = ofp_sendto(sockfd, buf, len, ofp_flags, (const struct ofp_sockaddr *)addr, ofp_addrlen);
                 errno = NETWRAP_ERRNO(ofp_errno);
         } else if (libc_send)
                 send_value = (*libc_sendto)(sockfd, buf, len, flags, addr, addrlen);
@@ -819,5 +856,7 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct 
                 }
         }
 
+	printf("exit sendto()\n");
         return send_value;
 } 
+#endif
